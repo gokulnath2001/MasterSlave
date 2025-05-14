@@ -1,0 +1,59 @@
+version: '3'
+
+services:
+  mysql-master:
+    image: mysql:8.0
+    container_name: mysql-master
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: master_root_password
+      MYSQL_DATABASE: myntra_inventory_replenisher
+      MYSQL_USER: myuser
+      MYSQL_PASSWORD: mypassword
+    ports:
+      - "3306:3306"  # Expose master on port 3306
+    volumes:
+      - mysql-master-data:/var/lib/mysql
+      - ./master/conf.d:/etc/mysql/conf.d
+      - ./master/init:/docker-entrypoint-initdb.d
+    networks:
+      - mysql-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mysql-slave:
+    image: mysql:8.0
+    container_name: mysql-slave
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: slave_root_password
+      MYSQL_DATABASE: mydb
+      MYSQL_USER: myuser
+      MYSQL_PASSWORD: mypassword
+    ports:
+      - "3307:3306"  # Expose slave on port 3307
+    volumes:
+      - mysql-slave-data:/var/lib/mysql
+      - ./slave/conf.d:/etc/mysql/conf.d
+      - ./slave/init:/docker-entrypoint-initdb.d
+    networks:
+      - mysql-network
+    depends_on:
+      mysql-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mysql-master-data:
+  mysql-slave-data:
+
+networks:
+  mysql-network:
+    driver: bridge
